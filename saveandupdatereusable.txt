@@ -1,0 +1,910 @@
+// module imports
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    StyleSheet,
+    ScrollView,
+    Text,
+    View,
+    Alert,
+    Pressable,
+    Modal,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    SafeAreaView,
+    FlatList,
+    TextInput,
+    ActivityIndicator,
+    Dimensions,
+} from 'react-native';
+
+import {
+    widthPercentageToDP as wp,
+    heightPercentageToDP as hp
+} from 'react-native-responsive-screen';
+import { responsiveScreenHeight } from 'react-native-responsive-dimensions';
+import { moderateScale, moderateVerticalScale } from 'react-native-size-matters';
+
+import RNFS from 'react-native-fs';
+import { Checkbox } from 'react-native-paper';
+import RBSheet from "react-native-raw-bottom-sheet";
+import LinearGradient from 'react-native-linear-gradient';
+
+// icon imports
+import Feather from 'react-native-vector-icons/Feather';
+import Icon from 'react-native-vector-icons/FontAwesome';
+import AntDesign from 'react-native-vector-icons/AntDesign';
+import Matetial from 'react-native-vector-icons/MaterialCommunityIcons';
+
+// util imports
+import { RootColors } from './../../utils/Colors';
+import { FontFamily } from '../../utils/FontFamily';
+
+// store imports
+import { SetNotePadData } from '../../store/slices/notepadSlice';
+import { useAppDispatch } from '../../store/utils/storeTypes';
+
+// RTK imports
+import {
+    useDeleteNoteMutation,
+    useAddNoteMutation,
+    useGetNoteMutation,
+    useUpdateNoteMutation,
+    useUpdateNotesMutation,
+    useLazyGetNotesQuery
+} from '../../store/services/notepad/notepadService';
+
+// component imports
+import Header from '../header/Header';
+import Listitem from './forward/Listitem';
+import Menu from '../../../assets/SVG/Menu';
+import ToastMessage from '../../Toast/ToastMessage';
+import { notepadData } from '../../Data/notepadData';
+
+// logos
+import Omail from './../../../assets/welcome/o-mail.svg';
+import Oconnect from './../../../assets/welcome/o-connect.svg';
+import Onet from './../../../assets/welcome/o-net.svg';
+import Obless from './../../../assets/welcome/o-bless.svg';
+import Copy from './../../../assets/welcome/copy.svg';
+import Keep from './../../../assets/welcome/keep.svg';
+import Bluetooth from './../../../assets/welcome/bluetooth.svg';
+
+
+const listTab = ['SAVED', 'DRAFT', 'DELETE'];
+
+export default function SaveDraftReusable({ navigation, route }) {
+
+    const dispatch = useAppDispatch();
+
+    const [show, setShow] = useState(false)
+    const [isSelected, setSelection] = useState(false);
+    const [checked, setChecked] = React.useState(false);
+    const [selectedItems, setSelectedItems] = useState([]);
+    const [button, setButton] = useState(false)
+    const [itemData, setItemdata] = useState('')
+    const [todoData, setTodoData] = useState([]);
+    const [buttonOne, seTbuttonOne] = useState(false)
+    const [currentPage, setCurrentPage] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
+
+
+    const [getNotesList, { data: notes, isLoading, currentData }] = useLazyGetNotesQuery({});
+    const [deleteNote] = useDeleteNoteMutation();
+    const [deleteMultipleNotes] = useUpdateNotesMutation();
+    const [getNoteById] = useGetNoteMutation();
+    const [createNotes] = useAddNoteMutation();
+    const [updateNote] = useUpdateNoteMutation();
+    const [states, setStatus] = useState('SAVED');
+
+    const [listData, setListData] = useState(notepadData);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectTab, setSelectTab] = useState("saved")
+    const [downloadCount, setDownloadCount] = useState(0);
+    const [loading, setLoading] = useState(true)
+    const [searchs, setSearchs] = useState('');
+
+    const refRBSheet = useRef();
+    const shareRBSheet = useRef();
+    const DownloadRef = useRef(null);
+    const DeleteRef = useRef(null)
+    const SaveRef = useRef(null)
+
+
+    const filterdata = todoData?.filter(item =>
+        item?.title?.toUpperCase().includes(searchs.toUpperCase())
+    );
+
+    const draftShowToast = () => {
+        if (DownloadRef.current) {
+            DownloadRef.current.show();
+        }
+    }
+    const DeleteToast = () => {
+        if (DeleteRef.current) {
+            DeleteRef.current.show();
+        }
+    }
+    const SaveToast = () => {
+        if (SaveRef.current) {
+            SaveRef.current.show();
+        }
+    }
+
+    const handleDraftSave = async (noteId, status) => {
+        try {
+            const response = await updateNote({ noteId, status }).unwrap();
+            setStatus('SAVE')
+            setSelectTab('saved')
+        } catch (err) {
+            console.log(err);
+        }
+
+    };
+
+
+    useEffect(() => {
+        try {
+            const fetchData = async () => {
+                const response = await getNotesList({ status: selectTab, page: 1, pageSize: 100 }).unwrap().then().catch(err => console.log(err));
+                setTodoData(response?.subset);
+                setLoading(false)
+            };
+            fetchData();
+        }
+        catch (err) {
+            console.log(err)
+            setLoading(false)
+        }
+
+
+    }, [currentPage, pageSize, selectTab, currentData]);
+
+    //DownloadCopy..
+
+    const DownloadCopy = async (textOutput) => {
+        const data = {
+            title: textOutput.title.replace(/(\r\n|\n|\r)/gm, ''),
+            description: textOutput.description.replace(/(\r\n|\n|\r)/gm, '')
+        };
+        const content = `Title: ${data.title}\nDescription: ${data.description}`;
+        const filename = `${data.title}.txt`;
+        const path = RNFS.DownloadDirectoryPath + '/' + filename;
+
+        RNFS.writeFile(path, content, 'utf8')
+            .then(() => {
+                setDownloadCount(downloadCount + 1);
+                draftShowToast()
+            })
+            .catch((err) => {
+                console.error(err);
+                Alert.alert('Error', 'Failed to save the file.');
+            });
+    }
+
+    const handleSelect = (id) => {
+        const updatedList = listData.map(item => {
+            if (item.id === id) {
+                return { ...item, Selected: !item.Selected };
+            }
+            return item;
+        });
+        setListData(updatedList);
+    };
+
+    const renderItem = ({ item }) => (
+        <Listitem
+            title={item.title}
+            subtitle={item.subtitle}
+            imageUrl={item.imageUrl}
+            isSelected={item.Selected}
+            onSelect={() => handleSelect(item.id)}
+        />
+    );
+
+    const renderFilteredData = () => {
+        const filteredData = notepadData.filter(item =
+            item.title?.toLowerCase().includes(searchQuery?.toLowerCase())
+        );
+        setListData(filteredData);
+    };
+
+    //Status -SAVED-DRAFT-DELETE
+
+    const SetStatusFilter = (states) => {
+        setStatus(states)
+        switch (states) {
+            case 'SAVED':
+                setSelectTab('saved');
+                setSelection(false)
+                break;
+            case 'DRAFT':
+                setSelectTab('drafted');
+                setSelection(false)
+                break;
+            case 'DELETE':
+                setSelectTab('deleted');
+                setSelection(false)
+                break;
+            default:
+                setSelectTab('')
+
+        }
+    }
+
+    // Selected Tabs
+
+    useEffect(() => {
+        if (!route.params) {
+            return
+        }
+        if (route.params.activeTab === 'DRAFT') {
+            setStatus(route.params.activeTab)
+            setSelectTab('drafted')
+            setShow(false)
+        } else if (route.params.activeTab === 'DELETE') {
+            setStatus(route.params.activeTab)
+            setSelectTab('deleted')
+            setShow(false)
+        }
+        else {
+            setStatus(route.params.activeTab)
+            setSelectTab('saved')
+            setShow(false)
+
+        }
+    }, [route.params]);
+
+    // Restore the title description
+
+    const handleRestore = async (noteId, itemData) => {
+        try {
+            if (itemData.previousStatus === "saved") {
+                const response = await updateNote({ noteId, status: "saved" }).unwrap();
+                setChecked({ noteId: false });
+                setStatus('SAVE')
+                setSelectTab('saved')
+
+            } else {
+                const response = await updateNote({ noteId, status: "drafted" }).unwrap();
+                setStatus('DRAFT')
+                setSelectTab('drafted')
+            }
+        } catch (err) {
+            console.log(err);
+        }
+
+    };
+
+    // Make a copy 
+
+    const makeCopy = async (title, description, status) => {
+        try {
+            const response = await createNotes({ title, description, status }).unwrap();
+        } catch (err) {
+            console.log(err);
+        }
+    };
+
+    const makeNewCopy = async (id) => {
+        try {
+            const response = await getNoteById(id);
+            const { title, description, status } = response.data?.data;
+            if (response.data) {
+                makeCopy(title, description, status);
+            }
+        } catch (err) {
+            console.log(err);
+
+        }
+    };
+
+    const deleteOne = async (id,) => {
+        try {
+            const response = await deleteNote(id).unwrap();
+            if (response) {
+                DeleteToast()
+                setTimeout(() => {
+                    setStatus('DELETE')
+                    setSelectTab('deleted')
+                }, 1500)
+            }
+        }
+
+        catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    const manyDelete1 = async () => {
+        if (selectedItems.length > 0) {
+            try {
+                const idsToDelete = selectedItems.map((id) => id);
+                const selectedNotes = Object.keys(checked).filter((noteId) => checked[noteId]);
+                const updateData = idsToDelete.map((noteId) => ({
+                    noteId,
+                    status: todoData.find((note) => note._id === noteId)?.status,
+                }));
+
+                const response = await deleteMultipleNotes({ updateData }).unwrap();
+                setSelectedItems([]);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    };
+
+    const handleCheckboxChange = (id) => {
+        if (selectedItems.includes(id)) {
+            setSelectedItems(selectedItems.filter((item1) => item1 !== id));
+        } else {
+            setSelectedItems([...selectedItems, id]);
+        }
+    };
+
+    // seletct all button
+
+    const handleSelectAll = (state) => {
+        setButton(true)
+        const allItemIds = todoData.filter((item1) => item1.status === state);
+        const idsSelect = allItemIds.map((id) => id._id)
+
+        setSelectedItems(idsSelect);
+
+
+    };
+
+
+    const handleDelete = () => {
+        selectedItems.forEach(async (id) => {
+            await deleteOne(id);
+        });
+        setSelectedItems([]);
+    };
+    const handleSearch = (searchValue) => {
+        setSearchs(searchValue)
+    }
+
+    const handleShowTab = (show) => {
+        if (show === true) {
+            navigation.openDrawer();
+        }
+    }
+    return (
+        <>
+            <View style={styles.saveFileContainer}>
+                <Header
+                    notification={true}
+                    search={handleSearch}
+                    showTab={handleShowTab}
+                    componentName={'Notepad'}
+                />
+
+                <TouchableOpacity onPress={() => { handleSelectAll(selectTab), seTbuttonOne(!buttonOne) }}>
+                    {isSelected == false ? "" : <Text style={styles.selectAll} >Select All</Text>}
+                </TouchableOpacity>
+
+                <SafeAreaView>
+                    <View style={styles.listTab}>
+                        {
+                            listTab.map((status, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={[styles.btnTab, states === status && styles.btnTabActive]}
+                                    onPress={() => SetStatusFilter(status)}
+                                >
+                                    <Text style={[styles.textTab, states === status && styles.textTabActive]}>{status}</Text>
+                                </TouchableOpacity>
+                            ))
+                        }
+
+                    </View>
+                </SafeAreaView>
+
+                {/* {All Data saved drafted deleted} */}
+
+                <ScrollView>
+
+                    {
+                        loading ? <ActivityIndicator size="large" color="navy" /> :
+                            filterdata?.filter((e) => e?.status == selectTab)?.map((item) => {
+                                return (
+                                    <View key={item._id} >
+                                        <View style={styles.textAndInputContainer} >
+                                            <View style={styles.checkBoxStyle}>
+                                                {isSelected == false ? "" :
+                                                    <Checkbox
+                                                        status={selectedItems.includes(item._id) ? 'checked' : 'unchecked'}
+                                                        onPress={() => handleCheckboxChange(item._id)}
+                                                    />}
+                                            </View>
+                                            <View style={styles.listDataMain}>
+
+                                                <View >
+                                                    <Text style={styles.textInput}>{item?.title}</Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.optionMenu}>
+                                                {isSelected !== true ? <Text onPress={() => { setShow(!show), setItemdata(item), dispatch(SetNotePadData(item)) }}>
+                                                    <Menu ></Menu>
+                                                </Text> : ""}
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                )
+
+                            })
+                    }
+                    {/* {Saved model} */}
+
+                </ScrollView>
+                {(selectTab === 'saved') && show && <Modal
+                    transparent={true}
+                    visible={show}
+                    onRequestClose={() => setShow(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setShow(false)}>
+                        <View style={styles.modalContainer}>
+                            <View style={styles.modalContent}>
+                                <View style={{ margin: 5, }}>
+                                    <Text style={{ fontSize: 17, }} onPress={() => { DownloadCopy(itemData), setShow(!show) }}>Download</Text>
+
+                                </View>
+                                <TouchableOpacity style={{ margin: 5 }} onPress={() => refRBSheet.current.open()} >
+                                    <Text style={{ fontSize: 17, }}>Forward</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={{ margin: 5 }} >
+                                    <Text style={{ fontSize: 17, }}>Share</Text>
+                                </TouchableOpacity>
+                                <View style={{ margin: 5 }}>
+                                    <Text style={{ fontSize: 17, }} onPress={() => { makeNewCopy(itemData._id), setShow(!show) }}>Make a Copy</Text>
+                                </View>
+                                <View style={{ margin: 5 }}>
+                                    <Text style={{ fontSize: 17, }} onPress={() => { navigation.navigate("Edit (Office Work)", { sentData: itemData }) }}>Edit</Text>
+                                </View>
+                                <View style={{ margin: 5 }}>
+                                    <Text style={{ fontSize: 17, color: "red" }} onPress={() => { setSelection(!isSelected), setShow(!show) }}>Delete</Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => setShow(false)}
+                                    style={styles.closeButton}>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+                }
+
+                {/* {Drafted model} */}
+
+                {(selectTab === 'drafted') && show && <Modal
+                    transparent={true}
+                    visible={show}
+                    onRequestClose={() => setShow(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setShow(false)}>
+                        <View style={styles.modalContainer}>
+                            <View style={styles.modalContent}>
+                                <View style={{ margin: 5, }}>
+                                    <Text style={{ fontSize: 17, }} onPress={() => { handleDraftSave(itemData._id, "saved"), setShow(!show), SaveToast() }}>Save</Text>
+
+                                </View>
+                                <View style={{ margin: 5 }}>
+                                    <Text style={{ fontSize: 17, }} onPress={() => { navigation.navigate("Edit (Office Work)", { sentData: itemData }) }}>Edit</Text>
+                                </View>
+                                <View style={{ margin: 5 }}>
+                                    <Text style={{ fontSize: 17, color: "red" }} onPress={() => { setSelection(!isSelected), setShow(!show) }}>Delete</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => setShow(false)}
+                                    style={styles.closeButton}>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+                }
+
+                {/* {Deleted model} */}
+
+
+                {show && selectTab === 'deleted' && <Modal
+                    transparent={true}
+                    visible={show}
+                    onRequestClose={() => setShow(false)}
+                >
+                    <TouchableWithoutFeedback onPress={() => setShow(false)}>
+                        <View style={styles.modalContainer}>
+                            <View style={styles.modalContent}>
+                                <View style={{ margin: 5 }}>
+                                    <Text style={{ fontSize: 17, }} onPress={() => { handleRestore(itemData._id, itemData), setShow(!show) }}>Restore</Text>
+                                </View>
+                                <View style={{ margin: 5 }}>
+                                    <Text style={{ fontSize: 17, color: "red" }} onPress={() => { setSelection(!isSelected), setShow(!show) }}>Delete</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => setShow(false)}
+                                    style={styles.closeButton}>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </Modal>
+                }
+
+
+                {/* download */}
+                <View
+                    style={{
+                        justifyContent: "center",
+                        alignItems: "center",
+                    }}
+                >
+                    <RBSheet
+                        height={400}
+                        ref={refRBSheet}
+                        closeOnDragDown={true}
+                        closeOnPressMask={true}
+                        customStyles={{
+                            wrapper: {
+                                backgroundColor: "rgba(0, 0, 0, 0.6)"
+                            },
+                            draggableIcon: {
+                                backgroundColor: "#000"
+                            }
+                        }}
+                    >
+                        <View>
+                            <View style={styles.searchContainer}>
+                                <Icon name="search" size={20} style={styles.searchIcon} color='#4A76D7' />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    onChangeText={(text) => {
+                                        setSearchQuery(text);
+                                        renderFilteredData();
+                                    }}
+                                    value={searchQuery}
+                                    placeholder="Search..."
+                                />
+                            </View>
+                            <FlatList
+                                data={listData}
+                                renderItem={renderItem}
+                                keyExtractor={item => item.id}
+                            />
+
+                        </View>
+                        <View style={styles.forward}>
+                            <TouchableOpacity>
+                                <Text style={styles.cancel}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity>
+                                <Text style={styles.frw}>Forward</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </RBSheet>
+                </View>
+
+                {/* share */}
+
+                <View
+                    style={{
+                        justifyContent: "center",
+                        alignItems: "center",
+                    }}
+                >
+                    <RBSheet
+                        height={400}
+                        ref={shareRBSheet}
+                        closeOnDragDown={true}
+                        closeOnPressMask={true}
+                        customStyles={{
+                            wrapper: {
+                                backgroundColor: "rgba(0, 0, 0, 0.6)"
+                            },
+                            draggableIcon: {
+                                backgroundColor: "#000"
+                            }
+                        }}
+                    >
+                        <View style={styles.shareMain}>
+                            <View style={styles.topEdit}>
+                                <TouchableOpacity style={styles.textEdit}>
+                                    <Matetial name='note-outline' size={25} color='#061942' />
+                                </TouchableOpacity>
+                                <Text>Lorem ipsum dolor</Text>
+                            </View>
+                            <View style={styles.mainShareIcon}>
+                                <Text style={styles.share}>Share</Text>
+                                <View style={styles.shareIcon}>
+                                    <TouchableOpacity style={styles.shareLogo}>
+                                        <Omail width={90} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity>
+                                        <Oconnect width={90} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity>
+                                        <Onet width={90} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity>
+                                        <Obless width={90} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity>
+                                        <Copy width={90} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity>
+                                        <Keep width={90} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity>
+                                        <Bluetooth width={90} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </RBSheet>
+                </View>
+
+            </View>
+
+            {isSelected === false ? <Pressable onPress={() => {
+                navigation.navigate("createNotepad"), setStatus('SAVE'), setSelectTab('saved')
+            }}>
+                <LinearGradient colors={['#2368FF', '#144AC1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.buttonMain}>
+                    <Feather name='plus' size={25} color='#fff' style={styles.buttonStyles} />
+                </LinearGradient>
+            </Pressable> : ""
+            }
+
+            {buttonOne === true || isSelected === false ? "" :
+                <TouchableOpacity onPress={() => { handleDelete(), setSelection(false) }}>
+                    {/* <Delete></Delete> */}
+                    <LinearGradient colors={['#2368FF', '#144AC1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.deleteButton}>
+                        <AntDesign name='delete' size={25} color='#fff' />
+                    </LinearGradient>
+                </TouchableOpacity>}
+
+            {buttonOne === false || isSelected === false ? "" : <TouchableOpacity onPress={() => { manyDelete1(), setSelection(false), DeleteToast() }}>
+                {/* <Delete></Delete> */}
+                <LinearGradient colors={['#2368FF', '#144AC1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.deleteButton}>
+                    <AntDesign name='delete' size={25} color='#fff' />
+                </LinearGradient>
+            </TouchableOpacity>}
+            <View style={[styles.toaster]}>
+                {/* <Toast ref={(ref) => Toast.setRef(ref)} position={'bottom'} /> */}
+                <ToastMessage
+                    type='success'
+                    text='Download Successfully'
+                    timeout={3000}
+                    ref={DownloadRef}
+                />
+
+                <ToastMessage
+                    type='danger'
+                    text='Deleted Successfully'
+                    timeout={3000}
+                    ref={DeleteRef}
+                />
+                <ToastMessage
+                    type='success'
+                    text='Saved Successfully'
+                    timeout={3000}
+                    ref={SaveRef}
+                />
+            </View>
+        </>
+    )
+}
+
+const styles = StyleSheet.create({
+    saveFileContainer: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: "#F0F4FF",
+        position: 'relative'
+    },
+    toaster: {
+        width: '100%',
+        paddingHorizontal: 15,
+        position: 'absolute',
+        bottom: 20
+
+    },
+    buttonMain: {
+        width: 60,
+        height: 60,
+        borderRadius: 50,
+        backgroundColor: "#144AC1",
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'absolute',
+        right: 10,
+        bottom: 10
+
+    },
+    buttonStyles: {
+        color: "white",
+        textAlign: "center",
+        fontSize: 40,
+
+    },
+    selectAll: {
+        width: '100%',
+        height: 'auto',
+        paddingHorizontal: 12,
+        paddingTop: moderateVerticalScale(15),
+        textAlign: 'right',
+        fontSize: 15,
+        color: "black",
+        fontFamily: FontFamily.PoppinsMedium,
+    },
+    textAndInputContainer: {
+        width: '90%',
+        height: 50,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        // justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: RootColors.White,
+        borderRadius: 5,
+        paddingHorizontal: moderateScale(15),
+        marginBottom: 4,
+        padding: 5,
+        shadowColor: 'black',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.6,
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    checkBoxStyle: {
+        marginLeft: 1,
+        marginRight: 2
+    },
+    listDataMain: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-start',
+        maxWidth: '90%',
+        overflow: 'hidden',
+        textAlign: "left"
+    },
+    textInput: {
+        color: '#000000',
+        alignItems: "center",
+        color: "black",
+        fontSize: 14,
+        fontFamily: FontFamily.PoppinsMedium,
+        textAlign: "left"
+
+
+    },
+    optionMenu: {
+        alignSelf: "flex-end",
+        marginLeft: "auto",
+        alignSelf: "center"
+    }
+    , modalContainer: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+
+
+    }, modalContent: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: 10,
+        borderTopRightRadius: 10,
+        padding: 20,
+    },
+    deleteButton: {
+
+        width: 60,
+        height: 60,
+        backgroundColor: "#144AC1",
+        backgroundImage: 'linear-gradient(45deg, #144AC1, #FF6347)',
+        borderRadius: 50,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'absolute',
+        right: 10,
+        bottom: 10
+
+    },
+    listTab: {
+        width: '100%',
+        borderBottomWidth: 2,
+        borderColor: '#CEDDFF',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 15,
+        marginBottom: 15
+    },
+    btnTab: {
+        width: Dimensions.get('window').width / 3.5,
+        flexDirection: 'row',
+        borderColor: '#6694F9',
+        padding: 10,
+        justifyContent: 'center'
+    },
+    btnTabActive: {
+        borderBottomWidth: 2,
+    },
+    textTabActive: {
+        color: '#6694F9'
+    },
+    textTab: {
+        fontFamily: FontFamily.PoppinsMedium
+    },
+
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderBottomWidth: 0.5,
+        borderColor: '#D9E1F1',
+        margin: 10,
+        paddingHorizontal: 10,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    shareMain: {
+        width: wp(95),
+        alignSelf: 'center'
+    },
+    topEdit: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        alignItems: 'center'
+    },
+    textEdit: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        backgroundColor: '#F0F4FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10
+    },
+    mainShareIcon: {
+        width: wp(100),
+        marginTop: moderateScale(25)
+    },
+    share: {
+        fontFamily: FontFamily.PoppinsMedium,
+        fontSize: 15,
+        paddingVertical: moderateVerticalScale(10)
+    },
+    shareIcon: {
+        flex: 1,
+        flexDirection: 'row',
+        flexWrap: 'wrap'
+    },
+    shareLogo: {
+        marginBottom: moderateVerticalScale(30)
+    },
+    forward: {
+        width: '100%',
+        height: responsiveScreenHeight(10),
+        padding: 15,
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        position: 'absolute',
+        bottom: 0,
+        zIndex: 9
+    },
+    cancel: {
+        fontFamily: FontFamily.PoppinsMedium,
+        color: '#E84C3D'
+    },
+    frw: {
+        fontFamily: FontFamily.PoppinsMedium,
+        color: '#2365F3'
+    },
+
+})
+

@@ -1,0 +1,71 @@
+// module imports
+import { notepadApi } from "../../queries/notepadApi";
+
+export const notepadService = notepadApi.injectEndpoints({
+
+    endpoints: (builder) => ({
+
+        getNotes: builder.query<any, any>({
+            query: ({status,page,pageSize}) => `/note/get-all?status=${status}&page=${page}&pageSize=${pageSize}`,
+            keepUnusedDataFor: 600,
+            transformResponse: (response: any) => response?.status ? response?.data : [],
+            transformErrorResponse: (response: any) => console.log('Error: \n', response),
+            providesTags: ['notepad'],
+        }),
+
+        getNote: builder.mutation({
+            query: (id) => ({
+                url: `/note/get/${id}`,
+                method: 'GET'
+            }),
+            invalidatesTags: ['notepad'],
+            // noteId
+        }),
+
+        addNote: builder.mutation({
+            query: notes => ({
+                url: '/note/create',
+                method: 'POST',
+                body: notes
+            }),
+            invalidatesTags: ['notepad'],
+        }),
+
+        updateNote: builder.mutation({
+            query: notes => ({
+                url: '/note/update',
+                method: 'PUT',
+                body: notes
+            }),
+            invalidatesTags: ['notepad'],
+        }),
+
+        updateNotes: builder.mutation({
+            query: notes => ({
+                url: '/note/bulk-update',
+                method: 'PUT',
+                body: notes
+            }),
+            invalidatesTags: ['notepad'],
+        }),
+
+        deleteNote: builder.mutation({
+            query: (id) => ({
+                url: `/note/delete/${id}`,
+                method: 'PUT'
+            }),
+            invalidatesTags: ['notepad'],
+        }),
+
+    })
+
+});
+
+export const {
+    useLazyGetNotesQuery,
+    useAddNoteMutation,
+    useGetNoteMutation,
+    useDeleteNoteMutation,
+    useUpdateNoteMutation,
+    useUpdateNotesMutation
+} = notepadService;

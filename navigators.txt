@@ -1,0 +1,115 @@
+import { StyleSheet, Text, View, Button } from 'react-native'
+import React, { useEffect, useState, createContext } from 'react'
+import { createStackNavigator } from '@react-navigation/stack';
+import { NavigationContainer } from '@react-navigation/native';
+import Parent from './normal/Parent';
+import Splash from './normal/Splash';
+import Login from './components/authentication/Login';
+import EmailPassword from './components/authentication/EmailPassword';
+import ForgotPassword from './components/authentication/ForgotPassword';
+import SavedFiles from './components/notepad/SavedFiles';
+import DraftsFile from './components/notepad/DraftsFile';
+import DeletedFiles from './components/notepad/DeletedFiles';
+import Notepad from './components/notepad/Notepad';
+import CreateNotepad from './components/notepad/CreateNotepad';
+import Edit from './components/notepad/Edit';
+import BottomHalfModel from './components/notepad/BottomHalfModel';
+// import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { FunctionProvider } from './components/notepad/test';
+
+
+// const Stack = createStackNavigator();
+const Tab = createMaterialTopTabNavigator();
+const Stack = createNativeStackNavigator();
+
+// export const createContextTesting = createContext({})
+
+const AppNavigator = () => {
+    // const [visible, setTesting1] = useState(false);
+
+    // const [titleTeXT, setTesting123] = useState('')
+
+    const [showSplashScreen, setShowSplashScreen] = useState(true);
+
+    // console.log("jaaaaaaaaaaaaaaaaaaaa", visible, titleTeXT)
+
+
+    useEffect(() => {
+        setTimeout(() => {
+            setShowSplashScreen(false)
+        }, 4000)
+    }, [])
+
+
+    const TabNav = () => {
+        return <Tab.Navigator>
+            <Tab.Screen name="save" component={SavedFiles} options={{ title: 'Saved' }} />
+            <Tab.Screen name="draft" component={DraftsFile} />
+            <Tab.Screen name="delete" component={DeletedFiles}></Tab.Screen>
+        </Tab.Navigator>
+    }
+
+    return (
+        // <createContextTesting.Provider value={{ titleTeXT,setTesting1, setTesting123 }}>
+
+        <NavigationContainer>
+            <Stack.Navigator
+                initialRouteName='notepad' screenOptions={{
+                    headerStyle: {
+                        backgroundColor: '#6694F9'
+                    },
+                    headerTintColor: 'white'
+
+                }}
+            >
+                <Stack.Screen
+                    options={{
+                        headerShown: false
+                    }}
+                    name="notepad" component={Notepad}></Stack.Screen>
+                <Stack.Screen name="createNotepad" component={CreateNotepad} options={({ navigation }) => ({
+                    title: 'Create Notepad',
+                    headerLeft: () => (
+                        <Text
+                            onPress={() => navigation.navigate('savesdraftDelete', { screen: 'draft' })
+                            }
+                            color="#fff"
+                        >Info</Text>
+                    ),
+                })} ></Stack.Screen>
+                {/* <Stack.Screen name="allfile" component={SaveDraftDelete}  options={{
+          headerShown: false,
+          headerBackVisible:false
+          
+          }}></Stack.Screen> */}
+                <Stack.Screen name="savesdraftDelete" component={TabNav} options={{
+                    headerShown: false,
+                    headerBackVisible: false
+                }}></Stack.Screen>
+                <Stack.Screen name="bottomModel" component={BottomHalfModel}></Stack.Screen>
+                <Stack.Screen name="Edit (Office Work)" component={Edit}></Stack.Screen>
+              
+                {/* headerBackVisible:false */}
+
+                <Stack.Screen name="Login" component={Login} options={{ headerShown: false }} />
+                <Stack.Screen name="Email" component={EmailPassword} options={{ headerShown: false }} />
+                <Stack.Screen name="Forgot" component={ForgotPassword} options={{ headerShown: false }} />
+                <Stack.Screen
+                    name="Parent"
+                    component={Parent}
+                    options={{ headerShown: false }}
+                />
+            </Stack.Navigator>
+
+        </NavigationContainer>
+
+        // </createContextTesting.Provider>
+
+    )
+}
+
+export default AppNavigator
+
+

@@ -1,0 +1,464 @@
+// module imports
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    StyleSheet,
+    Text,
+    View,
+    Pressable,
+    TextInput,
+    TouchableOpacity,
+    Dimensions,
+    Modal, TouchableWithoutFeedback
+} from 'react-native';
+
+import {
+    widthPercentageToDP as wp,
+    heightPercentageToDP as hp
+} from 'react-native-responsive-screen';
+import { scale, moderateScale, moderateVerticalScale } from 'react-native-size-matters';
+
+import Toast from 'react-native-toast-message';
+import LinearGradient from 'react-native-linear-gradient';
+
+// icon imports
+import Feather from 'react-native-vector-icons/Feather';
+import AntDesign from 'react-native-vector-icons/AntDesign';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+
+// store imports
+import { useAppSelector } from '../../store/utils/storeTypes';
+
+// RTK imports
+import {
+    useUpdateNoteMutation
+} from '../../store/services/notepad/notepadService';
+
+// util imports
+import { RootColors, TextColors } from './../../utils/Colors';
+import { FontFamily } from '../../utils/FontFamily';
+
+// component imports
+import ToastMessage from '../../Toast/ToastMessage';
+
+
+const { width, height } = Dimensions.get('window');
+
+const Edit = ({ route, navigation }) => {
+
+    const notePadData = useAppSelector((state) => state?.notepadStore?.notePadData);
+
+    const [show, setShow] = useState(false)
+    const [inputHeight, setInputHeight] = useState(40);
+
+    const draftRef = useRef(null);
+    const updateRef = useRef(null)
+    const saveRef = useRef(null)
+    const deleteRef = useRef(null)
+
+    // const receivedData = route.params ? route.params.sentData : null;
+
+    const [descriptionUpdate, setDescriptionUpdate] = useState(
+        notePadData?.description || '',
+    );
+    const [textUpadate, setTextUpadate] = useState(notePadData?.title || '');
+
+    const [updateNote] = useUpdateNoteMutation();
+
+    const draftShowToast = () => {
+        if (draftRef.current) {
+            draftRef.current.show();
+        }
+    }
+
+    const deleteShowToast = () => {
+        if (deleteRef.current) {
+            deleteRef.current.show();
+        }
+    }
+
+    const SaveandUpdate = (type) => {
+        if (type == "Save") {
+            if (updateRef.current) {
+                updateRef.current.show();
+            }
+        }
+        else {
+            if (saveRef.current) {
+                saveRef.current.show();
+            }
+        }
+    }
+
+    useEffect(() => {
+        navigation.setOptions({
+            headerLeft: () => (
+                <Text onPress={() => { handleBackPress(), draftShowToast() }} style={{ marginLeft: 5, marginRight: 10 }}>
+                    <AntDesign name='arrowleft' size={25} color='white' style={styles.mic} />
+                </Text>
+            ),
+            headerRight: () => (
+                <Text onPress={() => { setShow(!show) }}>
+                    <AntDesign name='delete' size={25} color='white' style={styles.mic} />
+                </Text>
+            ),
+        });
+    }, [navigation, textUpadate, descriptionUpdate]);
+
+
+    const handleBackPress = () => {
+        if (textUpadate || descriptionUpdate) {
+
+            draftNotedPad('drafted');
+            setTimeout(() => {
+                navigation.navigate('alllist', { activeTab: 'DRAFT' })
+            }, 1000)
+            // navigation.navigate('alllist', { activeTab: 'DRAFT' });
+        }
+    };
+
+    const updateNotepads = async status1 => {
+
+        let dataTosend = {
+            title: textUpadate,
+            description: descriptionUpdate,
+            status: status1,
+            noteId: notePadData?._id || '',
+        };
+
+        try {
+            let savedData = await updateNote(dataTosend).unwrap();
+            const status = (notePadData?.status === 'saved' || status1 === 'saved') ? 'SAVED' : 'DRAFT';
+
+            setTimeout(() => {
+                navigation.navigate('alllist', { activeTab: status });
+            }, 1000)
+            // navigation.navigate('alllist', { activeTab: status });
+        } catch (error) {
+            console.log(error);
+        }
+
+    };
+
+    const deleteEditNotepads = async status1 => {
+
+        let dataTosend = {
+            title: textUpadate,
+            description: descriptionUpdate,
+            status: status1,
+            noteId: notePadData?._id || '',
+        };
+
+        try {
+            let savedData = await updateNote(dataTosend).unwrap();
+            const status = (notePadData?.status === 'deleted' || status1 === 'deleted') ? 'DELETE' : null;
+            // navigation.navigate('alllist', { activeTab: status });
+            setTimeout(() => {
+                navigation.navigate('alllist', { activeTab: status })
+            }, 1000)
+        } catch (error) {
+            console.log(error);
+        }
+
+    };
+
+    const draftNotedPad = async status1 => {
+        let dataTosend = {
+            title: textUpadate,
+            description: descriptionUpdate,
+            status: status1,
+            noteId: notePadData?._id,
+        };
+
+        try {
+            let jsondata = await updateNote(dataTosend).unwrap();
+        } catch (error) {
+            console.log(error);
+        }
+
+    };
+
+    const handleChangeText = (newText) => {
+        setDescriptionUpdate(newText);
+    };
+
+
+    return (
+        <View style={styles.container}>
+            {/* middle */}
+            <View style={styles.mainCreate}>
+                <View style={styles.textAndInputContainer}>
+                    <Text style={styles.textHeading}>
+                        Title
+                    </Text>
+                    <View style={styles.micText}>
+                        <TextInput
+                            multiline
+                            maxLength={200}
+                            placeholder="Enter Title"
+                            value={textUpadate}
+                            keyboardType="default"
+                            style={styles.input}
+                            onChangeText={value => setTextUpadate(value)}
+                        />
+                        <Feather name='mic' size={20} color={RootColors.Button2} style={styles.mic} />
+                    </View>
+                </View>
+
+                <View style={styles.textAndInputContainer}>
+                    <Text style={styles.textHeading}>
+                        Description
+                    </Text>
+                    <View style={styles.micText}>
+                        <TextInput
+                            multiline
+                            maxLength={200}
+                            placeholder='Enter Description'
+                            value={descriptionUpdate}
+                            style={styles.inputs}
+                            // onChangeText={value => setDescriptionUpdate(value)}
+                            onChangeText={handleChangeText}
+                            onContentSizeChange={event => setInputHeight(event.nativeEvent.contentSize.height)}
+                        />
+                        <Feather name='mic' size={20} color={RootColors.Button2} style={styles.mic} />
+                    </View>
+                </View>
+
+                <Pressable style={styles.buttons}>
+                    {/* <View style={styles.buttons}>
+                        <Text style={styles.createButton} onPress={() => { updateNotepads('saved'), handletoast(notePadData.status === 'saved' ? 'Update' : "Save") }}>
+                            {notePadData.status === 'saved' ? 'Update' : "Save"}
+                        </Text>
+                    </View> */}
+                    <LinearGradient colors={['#2368FF', '#144AC1']} style={{ borderRadius: 5, marginTop: 40 }}>
+                        <Text
+                            style={styles.textstyle}
+                            onPress={() => { updateNotepads('saved'), SaveandUpdate(notePadData.status === 'saved' ? 'Update' : "Save") }}
+                        >
+                            {notePadData.status === 'saved' ? 'Update' : "Save"}
+                        </Text>
+                    </LinearGradient>
+                </Pressable>
+
+                <View>
+                    <View>
+                        <Toast />
+                    </View>
+                </View>
+
+                <Pressable>
+                    <View style={styles.buttons}></View>
+                </Pressable>
+            </View>
+            {
+                show === false ? "" :
+                    <Modal
+                        transparent={true}
+                        visible={show}
+                        onRequestClose={() => setShow(!show)}
+                    >
+                        <TouchableWithoutFeedback onPress={() => setShow(!show)}>
+                            <View style={styles.modalContainer}>
+
+                                <View style={styles.modalContent}>
+                                    {/* <View style={{ position: "absolute", left: 163, top: 20, backgroundColor: "#A0A7B5", width: 80, height: 6, borderRadius: 5 }}>
+                                <Text>.</Text>
+                            </View> */}
+                                    <View style={{ marginTop: 10 }}>
+                                        <MaterialIcons name='horizontal-rule' size={100} color='#A0A7B5' style={styles.deletesss} />
+                                        <MaterialCommunityIcons name='delete-outline' size={55} color='#102E71' style={styles.deletes} />
+
+                                    </View>
+                                    <View >
+                                        <Text style={styles.deletess}>Are you sure want to delete ?</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => setShow(!show)}
+                                        style={styles.closeButton}>
+                                    </TouchableOpacity>
+                                    <View style={{ flexDirection: "row", justifyContent: "space-evenly", marginBottom: -20 }}>
+                                        <View style={{ marginTop: 20 }}>
+                                            <Text style={{ marginRight: 150, fontSize: 20, color: "#2365F3", marginTop: 5 }} onPress={() => { setShow(!show) }}>Cancel</Text>
+                                        </View>
+                                        <View style={{ marginTop: 20 }}>
+                                            <Text style={{ marginLeft: 150, fontSize: 20, color: "#E84C3D", marginTop: 5 }} onPress={() => { deleteEditNotepads('deleted'), setShow(!show), deleteShowToast() }}>Delete</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </Modal>
+            }
+
+            <View style={[styles.toaster]}>
+                {/* <Toast ref={(ref) => Toast.setRef(ref)} position={'bottom'} /> */}
+                <ToastMessage
+                    type='success'
+                    text='Saved to Drafts'
+                    timeout={4000}
+                    ref={draftRef}
+                />
+                <ToastMessage
+                    type='success'
+                    text='Saved Successfully'
+                    timeout={4000}
+                    ref={updateRef}
+                />
+                <ToastMessage
+                    type='success'
+                    text='Changes Updated'
+                    timeout={4000}
+                    ref={saveRef}
+                />
+                <ToastMessage
+                    type='danger'
+                    text='Deleted Successfully'
+                    timeout={4000}
+                    ref={deleteRef}
+                />
+            </View>
+
+        </View>
+    );
+
+};
+
+export default Edit;
+
+const styles = StyleSheet.create({
+    container: {
+        width: "100%",
+        height: "100%",
+        backgroundColor: RootColors.BgColor
+    },
+    textstyle: {
+        color: RootColors.White,
+        padding: 10,
+        width: 80,
+        textAlign: "center",
+    },
+    toaster: {
+        width: '100%',
+        paddingHorizontal: 15,
+        position: 'absolute',
+        bottom: 20
+
+    },
+    buttons: {
+        width: wp(95),
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    top: {
+        height: hp(8),
+        width: wp(100),
+        backgroundColor: RootColors.Header,
+        justifyContent: 'center',
+    },
+    profileTop: {
+        paddingHorizontal: scale(10),
+        display: 'flex',
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        alignItems: 'center'
+    },
+    modalContent: {
+        backgroundColor: RootColors.White,
+        borderTopLeftRadius: 10,
+        borderTopRightRadius: 10,
+        padding: 80,
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    profileText: {
+        fontFamily: FontFamily.PoppinsMedium,
+        color: RootColors.White,
+        marginLeft: scale(5),
+        fontSize: 14
+    },
+    mainCreate: {
+        width: wp(95),
+        alignSelf: 'center'
+    },
+    titleStyle: {
+        color: TextColors.Text,
+    },
+    inputStyle: {
+        height: 30,
+        width: 200,
+        backgroundColor: RootColors.White,
+        alignItems: 'center',
+    },
+    createButton: {
+        width: 'auto',
+        height: 'auto',
+        backgroundColor: RootColors.Button,
+        paddingHorizontal: moderateScale(20),
+        paddingVertical: moderateVerticalScale(8),
+        borderRadius: 4,
+        marginVertical: moderateVerticalScale(25),
+        color: RootColors.White,
+    },
+    buttons: {
+        width: wp(95),
+        flexDirection: 'row',
+        justifyContent: 'flex-end'
+    },
+    textAndInputContainer: {
+        justifyContent: 'flex-start',
+        marginTop: 20,
+        textAlign: 'left',
+    },
+    textHeading: {
+        fontSize: 16,
+        fontFamily: FontFamily.PoppinsMedium,
+        color: RootColors.Text,
+    },
+    input: {
+        width: wp(95),
+        height: hp(6),
+        padding: 10,
+        marginBottom: 0,
+        borderRadius: 6,
+        borderWidth: 0,
+        backgroundColor: RootColors.White
+    },
+    inputs: {
+        width: wp(95),
+        padding: 10,
+        marginBottom: 0,
+        borderRadius: 6,
+        borderWidth: 0,
+        backgroundColor: RootColors.White
+    },
+    textAndInputContainer: {
+        marginVertical: moderateScale(8)
+    },
+    micText: {
+        flexDirection: 'row'
+    },
+    mic: {
+        position: 'absolute',
+        right: 15,
+        top: 10
+    },
+    deletes: {
+        position: 'absolute',
+        right: 100,
+        top: -55
+    },
+    deletess: {
+        textAlign: "center",
+        fontSize: 17,
+        color: "#485376"
+    },
+    deletesss: {
+        position: 'absolute',
+        right: 80,
+        top: -120,
+    }
+});
+
